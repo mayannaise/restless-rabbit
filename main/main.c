@@ -291,10 +291,10 @@ void app_main(void)
     sdmmc_card_print_info(stdout, card);
 
     // main application settings
-    const int attempt_limit_timeout_doubled = 9999; // after this many attempts, timeout is doubled
+    const int attempt_limit_timeout_doubled = 200;  // after this many attempts, timeout is doubled
     const int attempt_limit_no_timeouts = 1;        // you get this many attempts before hitting the timeout
     const int leeway_secs = 5;                      // allow for a few extra seconds to align times
-    int timeout_seconds = 480 + leeway_secs;        // number of seconds to wait after timeout hit
+    int timeout_seconds = 960 + leeway_secs;        // number of seconds to wait after timeout hit
 
     // configure status LED
     gpio_reset_pin(LED_GPIO);
@@ -317,15 +317,18 @@ void app_main(void)
 
     // skip through the file to find the starting passcode (from where we left off)
     int passcode = 0;
+    int num_passcodes_tried = 0;
     do
     {
         fscanf(pinlist, "%d", &passcode);
+        num_passcodes_tried++;
     } while (passcode != starting_passcode);
+    ESP_LOGI(LOG_TAG, "Previous attempts: %d", num_passcodes_tried);
 
     // get cracking (observing timeouts etc)...
     int attempts = 0;
     int consecutive_attempts = 0;
-    while (1)
+    while (!feof(pinlist))
     {
         if (tud_mounted())
         {
@@ -355,6 +358,19 @@ void app_main(void)
         vTaskDelay(pdMS_TO_TICKS(100));
         gpio_set_level(LED_GPIO, 0);
         vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
+    // tried every passcode in the dictionary file, flash LED to indicate done
+    while(1)
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            gpio_set_level(LED_GPIO, 1);
+            vTaskDelay(pdMS_TO_TICKS(100));
+            gpio_set_level(LED_GPIO, 0);
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+        vTaskDelay(pdMS_TO_TICKS(2000));
     }
 
     fclose(pinlist);
